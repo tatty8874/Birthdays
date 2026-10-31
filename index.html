@@ -289,6 +289,25 @@ function gcal(title,start,recur,det){
   var end=new Date(start.getFullYear(),start.getMonth(),start.getDate()+1);
   return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(title)+'&dates='+ymd(start)+'/'+ymd(end)+(recur?'&recur='+encodeURIComponent('RRULE:FREQ=YEARLY'):'')+'&details='+encodeURIComponent(det||'');
 }
+function icsEsc(t){return String(t).replace(/[\\,;]/g,function(c){return '\\'+c}).replace(/\n/g,'\\n')}
+function buildIcs(){
+  var now=new Date(),z=function(n){return ('0'+n).slice(-2)},
+  st=now.getUTCFullYear()+z(now.getUTCMonth()+1)+z(now.getUTCDate())+'T'+z(now.getUTCHours())+z(now.getUTCMinutes())+z(now.getUTCSeconds())+'Z',
+  L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Birthdays app//EN','CALSCALE:GREGORIAN'];
+  people.forEach(function(p){
+    var l=lead(p),nd=nextDate(p);
+    L.push('BEGIN:VEVENT','UID:'+p.id+'@birthdays-app','DTSTAMP:'+st,'DTSTART;VALUE=DATE:'+ymd(nd),'RRULE:FREQ=YEARLY','SUMMARY:'+icsEsc('🎂 '+p.name+'’s birthday'),'TRANSP:TRANSPARENT');
+    if(l>0)L.push('BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+icsEsc('Sort a present for '+p.name),'TRIGGER:-PT'+(l*24-9)+'H','END:VALARM');
+    L.push('BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+icsEsc(p.name+'’s birthday today'),'TRIGGER:PT9H','END:VALARM','END:VEVENT');
+  });
+  L.push('END:VCALENDAR');
+  return L.join('\r\n')+'\r\n';
+}
+function downloadIcs(){
+  var txt=buildIcs(),blob=new Blob([txt],{type:'text/calendar;charset=utf-8'}),u=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=u;a.download='birthdays.ics';document.body.appendChild(a);a.click();
+  setTimeout(function(){a.remove();URL.revokeObjectURL(u)},4000);
+}
 function remDate(p){var nd=nextDate(p);return new Date(nd.getFullYear(),nd.getMonth(),nd.getDate()-lead(p))}
 
 /* ---------- fun ---------- */
@@ -360,7 +379,7 @@ function view(){
     +'<h2>Ideas for your people</h2>'+(A.map(ideasCard).join('')||'<div class="empty">Add someone first.</div>');
   }else{
     v+='<div class="card"><div class="name">How early should I remind you?</div><div class="meta">Your usual setting. You can change it for one person when you edit them.</div><div class="bar" style="margin-top:10px">'+[[1,'1 day'],[3,'3 days'],[7,'1 week'],[14,'2 weeks'],[30,'1 month']].map(x=>'<button class="chip'+(S.lead===x[0]?' on':'')+'" data-a="lead" data-k="'+x[0]+'">'+x[1]+'</button>').join('')+'</div></div>'
-    +'<div class="card spark meta">This page can’t buzz your phone while it’s closed. Reminders show on the Home tab each time you open it. For real alerts, add the calendar events below to Google Calendar.</div>'
+    +(people.length?'<div class="card"><div class="name">📅 Apple Calendar</div><div class="meta">One tap adds every birthday as a yearly event, with an alert before it (your reminder setting) and another at 9am on the day.</div><div class="row"><button class="pri" data-a="ics">Add all to Apple Calendar</button></div><div class="meta" style="margin-top:8px">On iPhone: tap Download, then open <b>birthdays.ics</b> from the Downloads list or the Files app, and choose <b>Add All</b>. This is a one-off copy, so if you change a birthday later, tap again and add it again.</div></div>':'')+'<div class="card spark meta">This page can’t buzz your phone while it’s closed. Reminders show on the Home tab each time you open it. For real alerts, add the calendar events below to Google Calendar.</div>'
     +(A.map(p=>{var l=lead(p),rd=remDate(p),a=turning(p);
       return '<div class="card" data-id="'+esc(p.id)+'"><div class="top"><div><div class="name">'+av(p,36)+esc(p.name)+'</div><div class="meta">Birthday '+fmt(nextDate(p))+' · '+(l>0?'reminder '+(isDue(p)?'is due now':'on '+fmt(rd)):'reminders off')+'</div></div>'+(isDue(p)?'<span class="badge due">Due</span>':'')+'</div><div class="lk" style="margin-top:8px"><a href="'+gcal('🎂 '+p.name+'’s birthday'+(a?' (turns '+a+')':''),nextDate(p),1,'Birthday reminder')+'" target="_blank" rel="noopener">📅 Yearly birthday event</a>'+(l>0?'<a href="'+gcal('🎁 Sort a present for '+p.name,rd,0,'Birthday is '+fmt(nextDate(p)))+'" target="_blank" rel="noopener">⏰ Present reminder</a>':'')+'</div></div>'}).join('')||'<div class="empty">Add someone first.</div>');
   }
@@ -449,6 +468,7 @@ document.addEventListener('click',function(e){
   else if(a==='tab')go(t.getAttribute('data-t'));
   else if(a==='goideas'){ideaFor=p?p.id:'all';go('i')}
   else if(a==='ideafor'){ideaFor=k;render()}
+  else if(a==='ics'){downloadIcs()}
   else if(a==='gender'){p.gender=k;save();render()}
   else if(a==='addgift'){var q=people.find(x=>x.id===document.getElementById('gp').value),gt=document.getElementById('gt').value.trim();if(q&&gt){q.given.push({year:+document.getElementById('gy').value||0,gift:gt});save();render()}}
   else if(a==='rmgift'){p.given.splice(+k,1);save();render()}
