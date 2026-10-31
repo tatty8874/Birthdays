@@ -98,6 +98,8 @@ ol{padding-left:20px;margin:6px 0;font-size:14px;color:var(--mute)}
   </div>
   <label>Group</label><select id="fkind"></select>
   <label>Photo</label><div class="row" style="margin-top:0"><span id="phprev"></span><input type="file" id="fphoto" accept="image/*" style="flex:1;min-width:0"><button type="button" class="sm" data-a="rmphoto">Remove</button></div>
+  <label>Girl or boy (helps pick the right gift links)</label>
+  <select id="fgender"><option value="">Not set</option><option value="f">Girl / Woman</option><option value="m">Boy / Man</option></select>
   <label>Remind me</label>
   <select id="fremind"><option value="">Use my usual setting</option><option value="0">Don’t remind me</option><option value="1">1 day before</option><option value="3">3 days before</option><option value="7">1 week before</option><option value="14">2 weeks before</option><option value="30">1 month before</option></select>
   <label>Interests &amp; present ideas (one per line)</label><textarea id="fideas" rows="3"></textarea>
@@ -142,6 +144,7 @@ function norm(p){
   p.given=(p.given||[]).map(g=>typeof g==='string'?{year:0,gift:g}:g);
   if(!KINDS[p.kind])p.kind='other';
   p.year=+p.year||0;
+  p.gender=(p.gender==='f'||p.gender==='m')?p.gender:'';
   if(p.remind===''||p.remind===undefined)p.remind=null;
   return p;
 }
@@ -192,11 +195,13 @@ var LK={
  'ar':['Addison Ross · Gifts for her','https://www.addisonross.com/collections/gifts-for-her'],
  'ort':['Ortigia at Selfridges','https://www.selfridges.com/GB/en/cat/ortigia-sicilia']
 };
+var CURG='';
 function linkRow(keys,age){
   var L=[];
   (keys||[]).forEach(function(k){
     if(k==='age'){if(age<1)L.push(['Wicked Uncle · Babies',WU+'presents/all/babies']);else if(age<=14)L.push(['Wicked Uncle · Age '+age,WU+'presents/all/age-'+age])}
     else if(k.indexOf('wu')===0){if(age<=14)L.push(LK[k])}
+    else if(k==='ar')L.push(CURG==='m'?['Addison Ross · Gifts for him','https://www.addisonross.com/collections/gifts-for-him']:CURG==='f'?['Addison Ross · Gifts for her','https://www.addisonross.com/collections/gifts-for-her']:['Addison Ross · Go-to gifts','https://www.addisonross.com/collections/gifts']);
     else if(LK[k])L.push(LK[k]);
   });
   return L.length?'<div class="lk">'+L.map(function(l){return '<a href="'+l[1]+'" target="_blank" rel="noopener">'+esc(l[0])+'</a>'}).join('')+'</div>':'';
@@ -241,7 +246,41 @@ function sugg(age,kind){
   return b;
 }
 function sgList(list,pid){return list.map(function(s){return '<div class="sg"><b>'+esc(s[0])+'</b>'+linkRow(s[1],s[2])+(pid?'<button class="sm" data-a="save" data-t="'+esc(s[0])+'">＋ Save idea</button>':'')+'</div>'}).join('')}
-function creaHtml(c,pid){return '<div class="sg"><b>'+esc(c[0])+'</b><p>'+esc(c[1])+'</p>'+(pid?'<button class="sm" data-a="save" data-t="'+esc(c[0])+'">＋ Save idea</button>':'')+'</div>'}
+var AR='https://www.addisonross.com/collections/';
+function isKid(p,age){return age<=14||(p.kind==='godchild'&&age<18)}
+function wuPage(p,age){
+  var g=p.gender==='f'?'girls':p.gender==='m'?'boys':'all',who=g==='girls'?'girls':g==='boys'?'boys':'';
+  if(age<1)return ['Wicked Uncle · '+(who?who+' ':'')+'babies',WU+'presents/'+g+'/'+(g==='girls'?'baby-girls':g==='boys'?'baby-boys':'babies')];
+  if(age>=15)return ['Wicked Uncle · grown-ups',WU+'presents/'+g+'/age-15-105'];
+  return ['Wicked Uncle · '+(who?who+' ':'')+'age '+age,WU+'presents/'+g+'/age-'+age];
+}
+function personLinks(p,age){
+  if(!age)return [];
+  var L=[];
+  if(isKid(p,age)){
+    L.push(wuPage(p,age));
+    if(p.gender==='f'){L.push(['Mimi & Lula · Birthday',ML+'birthday']);L.push(['Mimi & Lula · Gifts',ML+'gifts']);if(age>=9)L.push(['Mimi & Lula · Older girls',ML+'older-girls'])}
+  }else{
+    L.push(p.gender==='f'?['Addison Ross · Gifts for her',AR+'gifts-for-her']:p.gender==='m'?['Addison Ross · Gifts for him',AR+'gifts-for-him']:['Addison Ross · Go-to gifts',AR+'gifts']);
+    L.push(['Ortigia (via Selfridges)','https://www.selfridges.com/GB/en/cat/ortigia-sicilia']);
+  }
+  return L;
+}
+var CL=['print','print',0,0,0,0,'craft','print',0,0,'craft','out','craft','craft',0,'craft'];
+function ideaLinks(i,p,age){
+  var t=CL[i],L=[];
+  if(!age||!t)return '';
+  if(t==='print'&&!isKid(p,age))L.push(['Frame it · Addison Ross Print & Fit',AR+'framed-photos-free-print-fit-service']);
+  if(t==='craft'&&isKid(p,age)&&age<=14)L.push(['Wicked Uncle · Crafty kids',WU+'categories/creativity']);
+  if(t==='out'&&isKid(p,age)&&age<=14)L.push(['Wicked Uncle · Outdoor explorers',WU+'categories/outdoorsy']);
+  return aLinks(L);
+}
+function aLinks(L){return L.length?'<div class="lk">'+L.map(function(l){return '<a href="'+l[1]+'" target="_blank" rel="noopener">'+esc(l[0])+'</a>'}).join('')+'</div>':''}
+function genderRow(p){
+  var o=[['','Not set'],['f','Girl / Woman'],['m','Boy / Man']];
+  return '<div class="row" style="margin-top:6px"><span class="meta">For:</span>'+o.map(function(x){return '<button class="chip'+((p.gender||'')===x[0]?' on':'')+'" data-a="gender" data-k="'+x[0]+'">'+x[1]+'</button>'}).join('')+'</div>';
+}
+function creaHtml(c,pid,p,i){return '<div class="sg"><b>'+esc(c[0])+'</b><p>'+esc(c[1])+'</p>'+(p?ideaLinks(i,p,turning(p)):'')+(pid?'<button class="sm" data-a="save" data-t="'+esc(c[0])+'">＋ Save idea</button>':'')+'</div>'}
 function angles(p){return ''}
 
 /* ---------- calendar reminders ---------- */
@@ -289,11 +328,12 @@ function card(p){
 }
 function ideasCard(p){
   var d=daysUntil(p),age=turning(p),last=lastGift(p);
-  var h='<div class="card" style="border-left:6px solid '+COL[p.kind]+'" data-id="'+esc(p.id)+'"><div class="name">'+av(p,36)+esc(p.name)+'</div>';
+  var h='<div class="card" style="border-left:6px solid '+COL[p.kind]+'" data-id="'+esc(p.id)+'"><div class="name">'+av(p,36)+esc(p.name)+'</div>'+genderRow(p);
   if(!age)return h+'<div class="meta">Birthday '+when(d)+'. Add their birth year for age-based ideas.</div><div class="row"><input class="ni" id="y'+esc(p.id)+'" type="number" placeholder="Birth year, e.g. 1985"><button class="sm" data-a="setyear">Set</button></div>'+ideaRows(p)+'</div>';
   h+='<div class="meta">Turns '+age+' '+when(d)+'</div>'+(last?'<div class="meta">Last present: '+esc(last)+'</div>':'');
   h+=ideaRows(p);
-  return h+'<div class="lbl">Ideas for '+age+'</div>'+sgList(sugg(age,p.kind),1,aud(p))+'</div>';
+  CURG=p.gender||'';var sl=sgList(sugg(age,p.kind),1,aud(p));CURG='';
+  return h+'<div class="lbl">Ideas for '+age+'</div>'+sl+'</div>';
 }
 function view(){
   var A=byDate(),v='';
@@ -312,7 +352,7 @@ function view(){
     +(A.filter(p=>filter==='all'||p.kind===filter).map(card).join('')||'<div class="empty">No birthdays here yet 🎈</div>');
   }else if(tab==='i'&&ideaFor!=='all'&&people.some(function(x){return x.id===ideaFor})){
     var sp=people.find(function(x){return x.id===ideaFor});
-    v+=chips()+ideasCard(sp)+'<h2>✨ Creative ideas for '+esc(sp.name)+'</h2><div class="card" data-id="'+esc(sp.id)+'">'+CREA.map(function(c){return creaHtml(c,1)}).join('')+'</div>';
+    v+=chips()+ideasCard(sp)+'<h2>✨ Creative ideas for '+esc(sp.name)+'</h2><div class="card" data-id="'+esc(sp.id)+'">'+(personLinks(sp,turning(sp)).length?'<div class="lbl">Shop for '+esc(sp.name)+(turning(sp)?' (turning '+turning(sp)+')':'')+'</div>'+aLinks(personLinks(sp,turning(sp))):'<div class="meta">Add a birth year to get shop links for their age.</div>')+CREA.map(function(c,i){return creaHtml(c,1,sp,i)}).join('')+'</div>';
   }else if(tab==='i'){
     v+=chips()+'<div class="card spark"><div class="name">Browse by age</div><div class="row"><input class="ni" id="bage" type="number" min="0" max="120" placeholder="Age" value="'+esc(browse.age)+'"><select id="bkind" style="width:auto">'+Object.keys(KINDS).map(k=>'<option value="'+k+'"'+(browse.kind===k?' selected':'')+'>'+KINDS[k]+'</option>').join('')+'</select><button class="sm pri" data-a="browse">Show</button></div>'
     +(browse.age!==''&&+browse.age>=0?sgList(sugg(+browse.age,browse.kind),0,audA(+browse.age,browse.kind)):'')+'</div>'
@@ -337,7 +377,7 @@ function go(t){tab=t;render();window.scrollTo(0,0)}
 function openForm(p){
   editing=p?p.id:null;show('form',1);
   fname.value=p?p.name:'';fday.value=p?p.day:'';fmonth.value=p?p.month:1;fyear.value=p&&p.year?p.year:'';
-  fkind.value=p?p.kind:'family';fideas.value=p?p.ideas.join('\n'):'';fremind.value=p&&p.remind!=null?p.remind:'';fphoto.value='';editPhoto=p&&p.photo||'';showPh();
+  fkind.value=p?p.kind:'family';fideas.value=p?p.ideas.join('\n'):'';fremind.value=p&&p.remind!=null?p.remind:'';fgender.value=p?p.gender||'':'';fphoto.value='';editPhoto=p&&p.photo||'';showPh();
   form.scrollIntoView({behavior:'smooth'});fname.focus();
 }
 function copy(txt){
@@ -352,6 +392,7 @@ function merge(inc){
     var m=people.find(p=>p.id===x.id||(p.name.toLowerCase()===x.name.toLowerCase()&&p.day===x.day&&p.month===x.month));
     if(!m){people.push(x);n++;return}
     if(!m.year&&x.year)m.year=x.year;
+    if(!m.gender&&x.gender)m.gender=x.gender;
     if(!m.photo&&x.photo)m.photo=x.photo;
     x.ideas.forEach(i=>{if(m.ideas.indexOf(i)<0)m.ideas.push(i)});
     x.given.forEach(g=>{if(!m.given.some(h=>h.gift===g.gift&&h.year===g.year))m.given.push(g)});
@@ -383,7 +424,7 @@ vcf.onchange=function(){
 };
 form.onsubmit=function(e){
   e.preventDefault();
-  var o={name:fname.value.trim(),day:+fday.value,month:+fmonth.value,year:+fyear.value||0,kind:fkind.value,remind:fremind.value===''?null:+fremind.value,photo:editPhoto,ideas:fideas.value.split('\n').map(s=>s.trim()).filter(Boolean)};
+  var o={name:fname.value.trim(),day:+fday.value,month:+fmonth.value,year:+fyear.value||0,kind:fkind.value,remind:fremind.value===''?null:+fremind.value,gender:fgender.value,photo:editPhoto,ideas:fideas.value.split('\n').map(s=>s.trim()).filter(Boolean)};
   if(!o.name||o.day<1||o.day>31)return;
   if(editing){Object.assign(people.find(x=>x.id===editing),o)}
   else{o.id=Math.random().toString(36).slice(2,14);o.given=[];people.push(o)}
@@ -408,6 +449,7 @@ document.addEventListener('click',function(e){
   else if(a==='tab')go(t.getAttribute('data-t'));
   else if(a==='goideas'){ideaFor=p?p.id:'all';go('i')}
   else if(a==='ideafor'){ideaFor=k;render()}
+  else if(a==='gender'){p.gender=k;save();render()}
   else if(a==='addgift'){var q=people.find(x=>x.id===document.getElementById('gp').value),gt=document.getElementById('gt').value.trim();if(q&&gt){q.given.push({year:+document.getElementById('gy').value||0,gift:gt});save();render()}}
   else if(a==='rmgift'){p.given.splice(+k,1);save();render()}
   else if(a==='rmphoto'){editPhoto='';showPh();fphoto.value=''}
